@@ -1,0 +1,14 @@
+{
+  "name": "hotel-reservation-system",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "workspaces": ["web"],
+  "scripts": {
+    "dev": "npm --workspace web run dev",
+    "build": "npm --workspace web run build",
+    "test": "npm --workspace web run test -- --coverage",
+    "lint": "npm --workspace web run lint",
+    "lighthouse": "npm --workspace web run lighthouse"
+  }
+}

@@ -1,0 +1,22 @@
+server:
+  port: ${SERVER_PORT:8081}
+spring:
+  application:
+    name: hotel-catalog-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/hotel?currentSchema=hotel_catalog}
+    username: ${DB_USER:hotel}
+    password: ${DB_PASSWORD:hotel}
+  flyway:
+    schemas: hotel_catalog
+    default-schema: hotel_catalog
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never

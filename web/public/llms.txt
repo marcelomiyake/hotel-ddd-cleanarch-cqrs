@@ -1,0 +1,14 @@
+# Wayfarer Stays
+
+> Browse independent boutique hotels in Brazil, compare room prices and availability, and make or manage a reservation.
+
+## Main pages
+
+- [Find a stay](/): Search stays in Rio de Janeiro or São Paulo, select dates and guests, and explore hotel details.
+- [My trips](/): Find reservations by the email used at booking and cancel eligible reservations.
+
+## Notes
+
+- Prices are displayed in Brazilian reais (BRL).
+- Reservations are confirmed immediately and paid at the property.
+- This local demonstration does not collect payment card details.

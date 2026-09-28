@@ -1,0 +1,25 @@
+server:
+  port: ${SERVER_PORT:8082}
+spring:
+  application:
+    name: reservation-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/hotel?currentSchema=hotel_reservation}
+    username: ${DB_USER:hotel}
+    password: ${DB_PASSWORD:hotel}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:12}
+      minimum-idle: 2
+  flyway:
+    schemas: hotel_reservation
+    default-schema: hotel_reservation
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never

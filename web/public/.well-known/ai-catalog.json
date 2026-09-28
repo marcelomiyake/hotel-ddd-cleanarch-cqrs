@@ -1,0 +1,27 @@
+{
+  "specVersion": "1.0",
+  "entries": [
+    {
+      "@context": "https://agenticresourcediscovery.org/context/v1",
+      "identifier": "urn:air:127.0.0.1:hotel:wayfarer-stays",
+      "displayName": "Wayfarer Stays",
+      "type": "application/ai-catalog+json",
+      "url": "http://127.0.0.1:4173/",
+      "description": "Search and reserve independent boutique hotel stays across Brazil.",
+      "representativeQueries": [
+        "Find an independent hotel in Rio de Janeiro for two guests.",
+        "Compare room availability and prices for a stay in São Paulo.",
+        "Find or cancel a reservation using the guest email."
+      ],
+      "capabilities": [
+        "SearchHotels",
+        "GetHotelDetails",
+        "GetAvailability",
+        "PlaceReservation",
+        "FindReservations",
+        "CancelReservation"
+      ],
+      "tags": ["travel", "hotel", "reservation", "Brazil", "BRL"]
+    }
+  ]
+}

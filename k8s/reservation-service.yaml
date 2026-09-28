@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: reservation-service
+  namespace: hotel-reservation
+spec:
+  selector:
+    app: reservation-service
+  ports:
+    - name: http
+      port: 8082
+      targetPort: 8082
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reservation-service
+  namespace: hotel-reservation
+  labels:
+    app: reservation-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: reservation-service
+  template:
+    metadata:
+      labels:
+        app: reservation-service
+    spec:
+      containers:
+        - name: reservation-service
+          image: hotel-reservation-service:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8082
+          env:
+            - name: DB_URL
+              value: jdbc:postgresql://postgres.hotel-reservation.svc.cluster.local:5432/hotel?currentSchema=hotel_reservation
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: hotel-postgres
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: hotel-postgres
+                  key: password
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1
+              memory: 640Mi
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            failureThreshold: 60
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 10
