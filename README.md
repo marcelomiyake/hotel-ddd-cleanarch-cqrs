@@ -150,10 +150,11 @@ Tracked screens are `home`, `results`, `hotel`, `checkout`, `confirmation`, and 
 
 The regression suites report 33 frontend tests with 87.82% line coverage. Java verification passed 19 tests; JaCoCo line coverage was 98.20% for Catalog and 97.92% for Reservation. SonarCloud reports **0 unresolved issues** and 90.4% overall coverage. The production frontend Lighthouse run scored 100 in Performance, Accessibility, Best Practices, SEO, and Agentic Browsing. Lighthouse SEO scored 100. The Chrome extension evaluation with **SEO META in 1 Click** could not be opened because browser policy rejected the Chrome extension-management URL; the static document metadata and Lighthouse SEO audit were checked instead. This was not a result from the extension.
 
-The prompt states that session and cache usage were empty before this task. Per-session input, cached input, reasoning, and output token counts are not exposed to this runtime, so an actual total cannot be calculated without inventing usage. Reasoning tokens are counted within output for this estimate and should be priced once.
+The prompt states that session and cache usage were empty before this task. The Codex runtime used here does not expose per-session token telemetry or a usage export/API, so it cannot report the input, cached input, reasoning, and output tokens accumulated during the work. An empty starting cache is only a baseline; it does not reveal subsequent token usage. Estimating totals from visible message text would miss hidden instructions, tokenization, cache accounting, and reasoning usage, so this table reports unavailable values instead of presenting a guess as measured data. Reasoning tokens are included within output for pricing and should be counted once.
 
 | Session usage | Tokens |
 | --- | ---: |
+| Implementation time | 56m 5s |
 | Input, including cached input | Unavailable |
 | Cached input (subset of input) | Unavailable; starting baseline was 0 |
 | Reasoning (subset of output) | Unavailable |
