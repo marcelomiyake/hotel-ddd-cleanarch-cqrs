@@ -1,9 +1,9 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { HotelCard, HotelDetails, RoomAvailability } from "../../src/domain/hotel";
 import type { Reservation } from "../../src/domain/reservation";
-import type { HotelReadPort, ReservationCommandPort, ReservationReadPort } from "../../src/application/ports";
+import type { HotelReadPort, ReservationCommandPort, ReservationFunnelEventPort, ReservationReadPort } from "../../src/application/ports";
 import { App } from "../../src/presentation/App";
 
 const hotel: HotelCard = {
@@ -44,14 +44,17 @@ function setupApp() {
     placeReservation: vi.fn().mockResolvedValue(booking),
     cancelReservation: vi.fn().mockResolvedValue({ ...booking, status: "CANCELLED" }),
   };
-  return { hotelGateway, reservationGateway };
+  const reservationFunnelGateway: ReservationFunnelEventPort = {
+    recordReservationFunnelEvent: vi.fn().mockResolvedValue(undefined),
+  };
+  return { hotelGateway, reservationGateway, reservationFunnelGateway };
 }
 
 describe("hotel reservation journeys", () => {
   it("searches, chooses a room, confirms a reservation, and cancels it from My trips", async () => {
     const user = userEvent.setup();
-    const { hotelGateway, reservationGateway } = setupApp();
-    render(<App hotelGateway={hotelGateway} reservationGateway={reservationGateway} />);
+    const { hotelGateway, reservationGateway, reservationFunnelGateway } = setupApp();
+    render(<App hotelGateway={hotelGateway} reservationGateway={reservationGateway} reservationFunnelGateway={reservationFunnelGateway} />);
 
     expect(await screen.findByRole("heading", { name: /Places with/i })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Search stays" }));
@@ -68,6 +71,11 @@ describe("hotel reservation journeys", () => {
       expect.objectContaining({ guestName: "Alex Traveler", guestEmail: "alex@example.com", roomTypeId: offer.roomTypeId }),
       expect.any(String),
     );
+    await waitFor(() => expect(reservationFunnelGateway.recordReservationFunnelEvent).toHaveBeenCalledTimes(2));
+    expect(reservationFunnelGateway.recordReservationFunnelEvent).toHaveBeenNthCalledWith(1,
+      expect.objectContaining({ eventType: "RESERVATION_STARTED", screen: "checkout", hotelId: hotel.id, roomTypeId: offer.roomTypeId }));
+    expect(reservationFunnelGateway.recordReservationFunnelEvent).toHaveBeenNthCalledWith(2,
+      expect.objectContaining({ eventType: "RESERVATION_CONFIRMED", screen: "confirmation", hotelId: hotel.id, roomTypeId: offer.roomTypeId }));
 
     await user.click(screen.getByRole("button", { name: "My trips" }));
     expect(await screen.findByLabelText("Email used for your reservation")).toHaveValue("alex@example.com");
@@ -89,8 +97,9 @@ describe("hotel reservation journeys", () => {
       placeReservation: vi.fn().mockRejectedValue(new Error("Reservation is unavailable.")),
       cancelReservation: vi.fn().mockRejectedValue(new Error("Cancellation is unavailable.")),
     };
+    const reservationFunnelGateway: ReservationFunnelEventPort = { recordReservationFunnelEvent: vi.fn().mockResolvedValue(undefined) };
     const user = userEvent.setup();
-    render(<App hotelGateway={hotelGateway} reservationGateway={reservationGateway} />);
+    render(<App hotelGateway={hotelGateway} reservationGateway={reservationGateway} reservationFunnelGateway={reservationFunnelGateway} />);
     expect(await screen.findByText("Good stays are on their way.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Search stays" }));
     expect(await screen.findByText("Inventory is unavailable.")).toBeInTheDocument();
@@ -99,11 +108,11 @@ describe("hotel reservation journeys", () => {
 
   it("keeps empty search results and an empty trips lookup actionable", async () => {
     const user = userEvent.setup();
-    const { hotelGateway, reservationGateway } = setupApp();
+    const { hotelGateway, reservationGateway, reservationFunnelGateway } = setupApp();
     vi.mocked(hotelGateway.searchHotels).mockResolvedValueOnce([hotel]).mockResolvedValueOnce([]);
     vi.mocked(reservationGateway.getAvailability).mockResolvedValueOnce([offer]).mockResolvedValueOnce([]);
     vi.mocked(reservationGateway.findReservations).mockResolvedValueOnce([]);
-    render(<App hotelGateway={hotelGateway} reservationGateway={reservationGateway} />);
+    render(<App hotelGateway={hotelGateway} reservationGateway={reservationGateway} reservationFunnelGateway={reservationFunnelGateway} />);
     await screen.findByRole("heading", { name: /Places with/i });
     fireEvent.change(screen.getByLabelText("Where to?"), { target: { value: "São Paulo" } });
     await user.click(screen.getByRole("button", { name: "Search stays" }));
@@ -112,5 +121,21 @@ describe("hotel reservation journeys", () => {
     await user.type(await screen.findByLabelText("Email used for your reservation"), "traveler@example.com");
     await user.click(screen.getByRole("button", { name: "Find my trips" }));
     expect(await screen.findByText("Your next stay starts here.")).toBeInTheDocument();
+  });
+
+  it("tracks the last reservation screen when a guest returns to hotel details", async () => {
+    const user = userEvent.setup();
+    const { hotelGateway, reservationGateway, reservationFunnelGateway } = setupApp();
+    render(<App hotelGateway={hotelGateway} reservationGateway={reservationGateway} reservationFunnelGateway={reservationFunnelGateway} />);
+
+    await screen.findByRole("heading", { name: /Places with/i });
+    await user.click(screen.getByRole("button", { name: "Search stays" }));
+    await user.click(await screen.findByRole("button", { name: /View Casa do Mar/ }));
+    await user.click(await screen.findByRole("button", { name: "Choose room" }));
+    await user.click(await screen.findByRole("button", { name: "Change room" }));
+
+    await waitFor(() => expect(reservationFunnelGateway.recordReservationFunnelEvent).toHaveBeenCalledTimes(2));
+    expect(reservationFunnelGateway.recordReservationFunnelEvent).toHaveBeenNthCalledWith(2,
+      expect.objectContaining({ eventType: "SCREEN_VIEWED", screen: "hotel" }));
   });
 });

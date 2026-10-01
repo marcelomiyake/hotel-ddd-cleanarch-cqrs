@@ -1,6 +1,7 @@
 node_modules/
 .tools/
 .scannerwork/
+.kind/
 web/node_modules/
 web/dist/
 web/coverage/

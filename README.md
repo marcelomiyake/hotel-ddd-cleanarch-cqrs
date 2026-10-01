@@ -66,24 +66,24 @@ Open <http://127.0.0.1:4173>. `kind-up.sh` builds the three local images, loads 
 
 ### SonarCloud
 
-The monorepo is analyzed as the existing SonarCloud project [`marcelomiyake_hotel-ddd-cleanarch-cqrs`](https://sonarcloud.io/project/overview?id=marcelomiyake_hotel-ddd-cleanarch-cqrs). The final analysis passed its quality gate and showed **0 open issues**, **0 security issues**, and **89.1% overall coverage**.
+The monorepo is analyzed as the existing SonarCloud project [`marcelomiyake_hotel-ddd-cleanarch-cqrs`](https://sonarcloud.io/project/overview?id=marcelomiyake_hotel-ddd-cleanarch-cqrs). The latest analysis passed its quality gate and reports **0 open issues**, **0 bugs**, **0 vulnerabilities**, **0 code smells**, and **90.4% overall coverage** across **4,083 non-comment lines of code**.
 
 Run `bash scripts/sonar-scan.sh` with `SONAR_TOKEN` available in the environment. It runs Maven verification, frontend tests with coverage, the frontend build, and the scanner. The scan configuration and project key are in `sonar-project.properties`; no token is stored in the repository.
 
 ### Tests and line coverage
 
-The final local run passed 17 Java tests and 26 frontend tests.
+The current local run passed 19 Java tests and 33 frontend tests.
 
 | Component | Line coverage |
 | --- | ---: |
 | Catalog service (JaCoCo) | 98.20% |
-| Reservation service (JaCoCo) | 97.59% |
-| React application (Vitest/V8) | 85.47% |
-| SonarCloud monorepo analysis | 89.1% |
+| Reservation service (JaCoCo) | 97.92% |
+| React application (Vitest/V8) | 87.82% |
+| SonarCloud monorepo analysis | 90.4% |
 
 ### Lighthouse and metadata
 
-The final Lighthouse run against the Kind hosted frontend scored **100** in Performance, Accessibility, Best Practices, SEO, and Agentic Browsing. The report is generated at `web/lighthouse-report.json` and is ignored by Git.
+The production frontend build, served by Vite preview with the local Kind services behind its API proxy, scored **100** in Performance, Accessibility, Best Practices, SEO, and Agentic Browsing. The report is generated at `web/lighthouse-report.json` and is ignored by Git.
 
 The document includes a localized title and description, `lang`, viewport and theme metadata, robots directive, Open Graph and Twitter cards, favicon, hero image preload, and discovery links. `robots.txt`, `llms.txt`, and the `.well-known` AI catalog and ARD documents are served by the frontend. The Lighthouse SEO category scored 100.
 
@@ -97,7 +97,7 @@ The user supplied a self-hosted OpenDesign workspace and handoff path. The works
 
 **Harness:** Codex, GPT-6 Luna with max effort.
 
-**LOC:** SonarCloud reported **3,862 non-comment lines of code** (`ncloc`) across 65 analyzed files at the final scan. This uses the SonarCloud source scope, not physical lines in documentation, generated files, images, or dependencies.
+**LOC at the initial implementation scan:** SonarCloud reported **3,862 non-comment lines of code** (`ncloc`) across 65 analyzed files before the reservation abandonment feature. This uses the SonarCloud source scope, not physical lines in documentation, generated files, images, or dependencies.
 
 The session usage snapshot below was read after implementation and verification, before the final usage figures and response were written. The earlier session and cache state were empty. Cached input is included in the input total; reasoning tokens are a subset of output tokens.
 
@@ -116,4 +116,54 @@ The estimated cost is **US$0.62** at the [OpenAI API’s current standard short-
 
 ```text
 Implement https://bytebytego.com/courses/system-design-interview/hotel-reservation-system in Java 25, React 19.3 (handoff from OpenDesign [To start it, from ~/.local/share/open-design, run ./node_modules/.bin/tools-dev start. Web UI: http://127.0.0.1:41919, self-hosted]), PostgreSQL, and Kubernetes via local Kind (2 replicas for each microservice). Use SonarQube Cloud via Chrome (https://sonarcloud.io/organizations/marcelomiyake/) to create and manage these monorepo projects, and complete this job with zero SonarQube issues and test coverage above 80%. If you need to run the scanner from the command line, I updated ~/.zshrc with the SONAR_TOKEN, but you can also use GitHub Actions and push commits in a loop until the issues are clean; if you generate another SONAR_KEY, update it in the GitHub project or in .zshrc. The frontend should have a perfect Lighthouse grade and a good SEO META evaluation in 1 Click. Finally, update the README.md with an analysis that includes this prompt, the harness used here (Codex, GPT-6 Luna with max effort), and the token costs from the sessions to complete this task (input tokens, cache tokens, reasoning tokens, output tokens) and LOC. The cache and sessions were empty just before starting this session. Consult the OpenAI official documentation for token prices to estimate total costs. This implementation must follow DDD, Clean Architecture, SOLID, and CQRS in the backend and frontend.
+```
+
+## Reservation abandonment analytics
+
+### Prompt analysis and implementation
+
+The requested feature needs to distinguish a checkout that was started from one that finished, preserve the last screen visited, and make the event data available for future analysis without an administrative UI. The browser now emits events for reservation start, later screen views, and successful reservation confirmation. Events are stored in the reservation service's PostgreSQL schema, and the `reservation_funnel_abandonments` view exposes attempts that have been inactive for 30 minutes, were started, and have no confirmation. The view includes the last screen plus hotel and room identifiers.
+
+The current checkout explicitly offers **pay at the property** and has no online payment step. For this implementation, a successful reservation confirmation is the completion event; an attempt that remains unconfirmed becomes an abandonment after 30 minutes without activity. The event model stores random session and attempt UUIDs, screen names, and hotel and room identifiers. It does not collect a guest name or email. Analytics writes are best effort and do not block reservation actions. Events share the existing PostgreSQL database and schema; no admin frontend or new user-facing booking step was added.
+
+Tracked screens are `home`, `results`, `hotel`, `checkout`, `confirmation`, and `trips`. The screen at the start event is `checkout`; subsequent screen events update the last screen in the database view. A real online payment flow can later replace the confirmation event as the conversion signal.
+
+### Change summary
+
+| Change type | Count |
+| --- | ---: |
+| Files created | 15 |
+| Files modified | 11 |
+| Files deleted | 0 |
+| Lines added | 590 |
+| Lines deleted | 31 |
+| Changed line pairs (min of additions and deletions in modified files) | 31 |
+| Net line delta | +559 |
+
+**Feature source LOC delta:** SonarCloud reports **+221 ncloc** (4,083 current versus 3,862 at the prior analysis).
+
+### Verification, LOC, and session cost
+
+**Harness:** Codex, GPT-6 Luna, max effort, as specified for this task.
+
+**LOC:** SonarCloud reports **4,083 non-comment lines of code** (`ncloc`) across 88 analyzed files after this feature. LOC excludes generated output and dependencies.
+
+The regression suites report 33 frontend tests with 87.82% line coverage. Java verification passed 19 tests; JaCoCo line coverage was 98.20% for Catalog and 97.92% for Reservation. SonarCloud reports **0 unresolved issues** and 90.4% overall coverage. The production frontend Lighthouse run scored 100 in Performance, Accessibility, Best Practices, SEO, and Agentic Browsing. Lighthouse SEO scored 100. The Chrome extension evaluation with **SEO META in 1 Click** could not be opened because browser policy rejected the Chrome extension-management URL; the static document metadata and Lighthouse SEO audit were checked instead. This was not a result from the extension.
+
+The prompt states that session and cache usage were empty before this task. Per-session input, cached input, reasoning, and output token counts are not exposed to this runtime, so an actual total cannot be calculated without inventing usage. Reasoning tokens are counted within output for this estimate and should be priced once.
+
+| Session usage | Tokens |
+| --- | ---: |
+| Input, including cached input | Unavailable |
+| Cached input (subset of input) | Unavailable; starting baseline was 0 |
+| Reasoning (subset of output) | Unavailable |
+| Output | Unavailable |
+| Estimated API token cost | Not calculable without session totals |
+
+The [official OpenAI API pricing page](https://developers.openai.com/api/docs/pricing) lists GPT-6 Luna standard short-context rates of **$0.10 per million uncached input tokens**, **$0.01 per million cached input tokens**, and **$0.50 per million output tokens**. Once token totals are available, estimate the API list-rate cost as `((input - cached input) × 0.10 + cached input × 0.01 + output × 0.50) / 1,000,000` USD. This is not a Codex subscription invoice.
+
+### Exact prompt
+
+```text
+I want you to implement a new feature that identifies when a user starts a reservation but abandons it before paying. I want us to track which screen the user stopped at before abandoning the reservation. No administrative frontend implementation is needed; I want the data stored in the database (it doesn't need to be the same existing relational database) so we can use it later to improve the system. So it's not necessary to change the frontend features for the user, but you can change the structure to track user events. In this case, if you change it, the frontend should have a perfect Lighthouse grade and good SEO META in 1 Click. Complete this job with zero SonarQube issues (not only new, but zero in total) and test coverage above 80%. I also want to add a new section to README.md with statistics for this new feature. Include the number of changes (how much was deleted, created, changed, etc.), an analysis that includes this prompt, the harness used here (Codex, GPT-6 Luna with max effort), and the token costs from the sessions to complete this task (input tokens, cache tokens, reasoning tokens, output tokens), plus LOC. The cache and sessions were empty just before starting this session. Consult the OpenAI official documentation for token prices to estimate total costs. Commit following https://www.conventionalcommits.org/and push to GitHub after all.
 ```

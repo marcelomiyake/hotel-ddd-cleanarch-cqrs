@@ -1,6 +1,7 @@
-import type { HotelReadPort, ReservationCommandPort, ReservationReadPort } from "../application/ports";
+import type { HotelReadPort, ReservationCommandPort, ReservationFunnelEventPort, ReservationReadPort } from "../application/ports";
 import type { HotelCard, HotelDetails, RoomAvailability } from "../domain/hotel";
 import type { PlaceReservationInput, Reservation } from "../domain/reservation";
+import type { ReservationFunnelEvent } from "../domain/reservation-funnel";
 import type { SearchCriteria } from "../domain/stay";
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -31,7 +32,7 @@ export class HotelHttpGateway implements HotelReadPort {
   }
 }
 
-export class ReservationHttpGateway implements ReservationReadPort, ReservationCommandPort {
+export class ReservationHttpGateway implements ReservationReadPort, ReservationCommandPort, ReservationFunnelEventPort {
   getAvailability(stay: SearchCriteria): Promise<RoomAvailability[]> {
     const query = new URLSearchParams({
       checkIn: stay.checkIn,
@@ -57,5 +58,14 @@ export class ReservationHttpGateway implements ReservationReadPort, ReservationC
     return requestJson(`/api/booking/reservations/${encodeURIComponent(id)}?email=${encodeURIComponent(email)}`, {
       method: "DELETE",
     });
+  }
+
+  async recordReservationFunnelEvent(event: ReservationFunnelEvent): Promise<void> {
+    const response = await fetch("/api/booking/reservation-funnel-events", {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify(event),
+    });
+    if (!response.ok) throw new Error(`Request failed (${response.status}).`);
   }
 }

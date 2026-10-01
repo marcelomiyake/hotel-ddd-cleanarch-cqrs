@@ -1,7 +1,8 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import type { HotelReadPort, ReservationCommandPort, ReservationReadPort } from "../application/ports";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import type { HotelReadPort, ReservationCommandPort, ReservationFunnelEventPort, ReservationReadPort } from "../application/ports";
 import { GetHotelDetailsQuery, FindAvailableRoomsQuery, SearchHotelsQuery } from "../application/hotel-queries";
 import { CancelReservationCommand, FindReservationsQuery, PlaceReservationCommand } from "../application/reservation-operations";
+import { getOrCreateReservationFunnelSessionId, ReservationFunnelEventRecorder } from "../application/reservation-funnel-tracking";
 import type { HotelCard, HotelDetails, RoomAvailability, RoomType } from "../domain/hotel";
 import type { Reservation } from "../domain/reservation";
 import { defaultSearch, validateSearch } from "../domain/stay";
@@ -15,14 +16,21 @@ const ConfirmationPage = lazy(() => import("./pages").then((module) => ({ defaul
 const TripsPage = lazy(() => import("./pages").then((module) => ({ default: module.TripsPage })));
 
 type Screen = "home" | "results" | "hotel" | "checkout" | "confirmation" | "trips";
+type TrackedAttempt = { readonly attemptId: string | null; readonly screen: Screen | null; readonly completed: boolean };
 
 type AppProps = {
   readonly hotelGateway: HotelReadPort;
   readonly reservationGateway: ReservationReadPort & ReservationCommandPort;
+  readonly reservationFunnelGateway: ReservationFunnelEventPort;
 };
 
-export function App({ hotelGateway, reservationGateway }: AppProps) {
+export function App({ hotelGateway, reservationGateway, reservationFunnelGateway }: AppProps) {
   const [screen, setScreen] = useState<Screen>("home");
+  const [funnelSessionId] = useState(() => getOrCreateReservationFunnelSessionId(
+    window.sessionStorage, () => window.crypto.randomUUID(),
+  ));
+  const [reservationAttemptId, setReservationAttemptId] = useState<string | null>(null);
+  const trackedAttempt = useRef<TrackedAttempt>({ attemptId: null, screen: null, completed: false });
   const [criteria, setCriteria] = useState(defaultSearch);
   const [hotels, setHotels] = useState<HotelCard[]>([]);
   const [availability, setAvailability] = useState<RoomAvailability[]>([]);
@@ -41,6 +49,9 @@ export function App({ hotelGateway, reservationGateway }: AppProps) {
   const placeReservation = useMemo(() => new PlaceReservationCommand(reservationGateway), [reservationGateway]);
   const findReservations = useMemo(() => new FindReservationsQuery(reservationGateway), [reservationGateway]);
   const cancelReservation = useMemo(() => new CancelReservationCommand(reservationGateway), [reservationGateway]);
+  const funnelEventRecorder = useMemo(
+    () => new ReservationFunnelEventRecorder(reservationFunnelGateway), [reservationFunnelGateway],
+  );
 
   useEffect(() => {
     const titleByScreen: Record<Screen, string> = {
@@ -53,6 +64,32 @@ export function App({ hotelGateway, reservationGateway }: AppProps) {
     };
     document.title = titleByScreen[screen];
   }, [criteria.city, hotelDetails, screen]);
+
+  useEffect(() => {
+    if (!reservationAttemptId) return;
+    const cursor = trackedAttempt.current;
+    const eventDetails = {
+      sessionId: funnelSessionId,
+      reservationAttemptId,
+      screen,
+      hotelId: hotelDetails?.hotel.id,
+      roomTypeId: selectedRoom?.id,
+    };
+
+    if (cursor.attemptId !== reservationAttemptId) {
+      trackedAttempt.current = { attemptId: reservationAttemptId, screen, completed: false };
+      void funnelEventRecorder.record({ ...eventDetails, eventType: "RESERVATION_STARTED" });
+      return;
+    }
+    if (cursor.completed || cursor.screen === screen) return;
+
+    const confirmed = screen === "confirmation" && reservation !== null;
+    trackedAttempt.current = { attemptId: reservationAttemptId, screen, completed: confirmed };
+    void funnelEventRecorder.record({
+      ...eventDetails,
+      eventType: confirmed ? "RESERVATION_CONFIRMED" : "SCREEN_VIEWED",
+    });
+  }, [funnelEventRecorder, funnelSessionId, hotelDetails?.hotel.id, reservation, reservationAttemptId, screen, selectedRoom?.id]);
 
   useEffect(() => {
     let active = true;
@@ -104,6 +141,9 @@ export function App({ hotelGateway, reservationGateway }: AppProps) {
   }
 
   function chooseRoom(room: RoomType) {
+    if (!reservationAttemptId || trackedAttempt.current.completed) {
+      setReservationAttemptId(window.crypto.randomUUID());
+    }
     setSelectedRoom(room);
     setError("");
     setScreen("checkout");

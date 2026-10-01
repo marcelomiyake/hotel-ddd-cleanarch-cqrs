@@ -6,7 +6,9 @@ import com.wayfarer.reservation.application.FindReservationsHandler;
 import com.wayfarer.reservation.application.GetAvailabilityHandler;
 import com.wayfarer.reservation.application.GetReservationHandler;
 import com.wayfarer.reservation.application.PlaceReservationHandler;
+import com.wayfarer.reservation.application.RecordReservationFunnelEventHandler;
 import com.wayfarer.reservation.application.ReservationIdGenerator;
+import com.wayfarer.reservation.application.ReservationFunnelEventStore;
 import com.wayfarer.reservation.application.ReservationQueries;
 import com.wayfarer.reservation.application.ReservationStore;
 import com.wayfarer.reservation.application.RoomInventory;
@@ -41,6 +43,12 @@ class ReservationUseCaseConfiguration {
                                                    TransactionBoundary transactions, ReservationIdGenerator ids,
                                                    Clock clock) {
         return new PlaceReservationHandler(store, inventory, transactions, ids, clock);
+    }
+
+    @Bean
+    RecordReservationFunnelEventHandler recordReservationFunnelEventHandler(ReservationFunnelEventStore eventStore,
+                                                                            Clock clock) {
+        return new RecordReservationFunnelEventHandler(eventStore, clock);
     }
 
     @Bean

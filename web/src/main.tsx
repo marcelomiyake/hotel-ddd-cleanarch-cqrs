@@ -11,6 +11,6 @@ const hotels = new HotelHttpGateway();
 const reservations = new ReservationHttpGateway();
 createRoot(root).render(
   <React.StrictMode>
-    <App hotelGateway={hotels} reservationGateway={reservations} />
+    <App hotelGateway={hotels} reservationGateway={reservations} reservationFunnelGateway={reservations} />
   </React.StrictMode>,
 );

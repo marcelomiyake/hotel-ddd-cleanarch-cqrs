@@ -2,6 +2,8 @@ package com.wayfarer.reservation;
 
 import com.wayfarer.reservation.adapter.in.web.AvailabilityResponse;
 import com.wayfarer.reservation.adapter.in.web.PlaceReservationRequest;
+import com.wayfarer.reservation.adapter.in.web.ReservationFunnelEventController;
+import com.wayfarer.reservation.adapter.in.web.ReservationFunnelEventRequest;
 import com.wayfarer.reservation.adapter.in.web.ReservationCommandController;
 import com.wayfarer.reservation.adapter.in.web.ReservationExceptionHandler;
 import com.wayfarer.reservation.adapter.in.web.ReservationQueryController;
@@ -12,6 +14,8 @@ import com.wayfarer.reservation.application.RoomInventory;
 import com.wayfarer.reservation.domain.DomainRuleViolation;
 import com.wayfarer.reservation.domain.IdempotencyConflictException;
 import com.wayfarer.reservation.domain.Reservation;
+import com.wayfarer.reservation.domain.ReservationFunnelEventType;
+import com.wayfarer.reservation.domain.ReservationFunnelScreen;
 import com.wayfarer.reservation.domain.ReservationAccessDeniedException;
 import com.wayfarer.reservation.domain.ReservationNotFoundException;
 import com.wayfarer.reservation.domain.ReservationStatus;
@@ -30,7 +34,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.time.LocalDate;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.ZoneOffset;
+import java.sql.Timestamp;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -56,6 +63,9 @@ class ReservationIntegrationTest {
 
     @Autowired
     private ReservationCommandController commands;
+
+    @Autowired
+    private ReservationFunnelEventController funnelEvents;
 
     @Autowired
     private ReservationQueryController queries;
@@ -168,6 +178,43 @@ class ReservationIntegrationTest {
                 .isEqualTo(HttpStatus.NOT_FOUND.value());
         assertThat(errors.forbidden(new ReservationAccessDeniedException()).getStatus())
                 .isEqualTo(HttpStatus.FORBIDDEN.value());
+    }
+
+    @Test
+    void storesReservationScreensAndListsInactiveUnconfirmedAttempts() {
+        UUID sessionId = UUID.randomUUID();
+        UUID attemptId = UUID.randomUUID();
+        UUID unstartedAttemptId = UUID.randomUUID();
+        funnelEvents.recordEvent(new ReservationFunnelEventRequest(sessionId, attemptId,
+                ReservationFunnelEventType.RESERVATION_STARTED, ReservationFunnelScreen.CHECKOUT,
+                HOTEL_ID, ROOM_ID));
+        funnelEvents.recordEvent(new ReservationFunnelEventRequest(sessionId, attemptId,
+                ReservationFunnelEventType.SCREEN_VIEWED, ReservationFunnelScreen.HOTEL,
+                HOTEL_ID, ROOM_ID));
+        funnelEvents.recordEvent(new ReservationFunnelEventRequest(sessionId, unstartedAttemptId,
+                ReservationFunnelEventType.SCREEN_VIEWED, ReservationFunnelScreen.RESULTS,
+                HOTEL_ID, null));
+        Timestamp inactiveSince = Timestamp.from(Instant.now().minus(Duration.ofMinutes(31)));
+        jdbc.update("UPDATE reservation_funnel_events SET occurred_at = ? WHERE session_id = ?",
+                inactiveSince, sessionId);
+
+        var abandoned = jdbc.queryForMap("""
+                SELECT last_screen, hotel_id, room_type_id
+                FROM reservation_funnel_abandonments
+                WHERE reservation_attempt_id = ?
+                """, attemptId);
+        assertThat(abandoned).containsEntry("last_screen", "hotel")
+                .containsEntry("hotel_id", HOTEL_ID).containsEntry("room_type_id", ROOM_ID);
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM reservation_funnel_abandonments WHERE reservation_attempt_id = ?
+                """, Integer.class, unstartedAttemptId)).isZero();
+
+        funnelEvents.recordEvent(new ReservationFunnelEventRequest(sessionId, attemptId,
+                ReservationFunnelEventType.RESERVATION_CONFIRMED, ReservationFunnelScreen.CONFIRMATION,
+                HOTEL_ID, ROOM_ID));
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM reservation_funnel_abandonments WHERE reservation_attempt_id = ?
+                """, Integer.class, attemptId)).isZero();
     }
 
     private static PlaceReservationRequest request(int daysFromToday, String email) {
