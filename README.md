@@ -150,18 +150,20 @@ Tracked screens are `home`, `results`, `hotel`, `checkout`, `confirmation`, and 
 
 The regression suites report 33 frontend tests with 87.82% line coverage. Java verification passed 19 tests; JaCoCo line coverage was 98.20% for Catalog and 97.92% for Reservation. SonarCloud reports **0 unresolved issues** and 90.4% overall coverage. The production frontend Lighthouse run scored 100 in Performance, Accessibility, Best Practices, SEO, and Agentic Browsing. Lighthouse SEO scored 100. The Chrome extension evaluation with **SEO META in 1 Click** could not be opened because browser policy rejected the Chrome extension-management URL; the static document metadata and Lighthouse SEO audit were checked instead. This was not a result from the extension.
 
-The prompt states that session and cache usage were empty before this task. The Codex runtime used here does not expose per-session token telemetry or a usage export/API, so it cannot report the input, cached input, reasoning, and output tokens accumulated during the work. An empty starting cache is only a baseline; it does not reveal subsequent token usage. Estimating totals from visible message text would miss hidden instructions, tokenization, cache accounting, and reasoning usage, so this table reports unavailable values instead of presenting a guess as measured data. Reasoning tokens are included within output for pricing and should be counted once.
+The prompt states that session and cache usage were empty before this task. I found one local Codex session log for 2026-10-01. It contains repeated cumulative `thread_token_usage` snapshots, so the totals below use the final snapshot rather than adding snapshots together. Input includes cached input; reasoning is a subset of output. The log reports zero cache-write input tokens.
 
 | Session usage | Tokens |
 | --- | ---: |
 | Implementation time | 56m 5s |
-| Input, including cached input | Unavailable |
-| Cached input (subset of input) | Unavailable; starting baseline was 0 |
-| Reasoning (subset of output) | Unavailable |
-| Output | Unavailable |
-| Estimated API token cost | Not calculable without session totals |
+| Input, including cached input | 19,341,292 |
+| Cached input (subset of input) | 19,002,624 |
+| Uncached input (derived) | 338,668 |
+| Cache-write input | 0 |
+| Reasoning (subset of output) | 65,429 |
+| Output, including reasoning | 94,710 |
+| Estimated API token cost | $0.27124804 |
 
-The [official OpenAI API pricing page](https://developers.openai.com/api/docs/pricing) lists GPT-6 Luna standard short-context rates of **$0.10 per million uncached input tokens**, **$0.01 per million cached input tokens**, and **$0.50 per million output tokens**. Once token totals are available, estimate the API list-rate cost as `((input - cached input) × 0.10 + cached input × 0.01 + output × 0.50) / 1,000,000` USD. This is not a Codex subscription invoice.
+Using the [official OpenAI API pricing page](https://developers.openai.com/api/docs/pricing), this estimate applies GPT-6 Luna Standard short-context rates: **$0.10 per million uncached input tokens**, **$0.01 per million cached input tokens**, and **$0.50 per million output tokens**. Calculation: `((19,341,292 - 19,002,624) × 0.10 + 19,002,624 × 0.01 + 94,710 × 0.50) / 1,000,000 = $0.27124804`. Reasoning is already included in output and is not priced twice. This API list-rate estimate is not a Codex subscription invoice.
 
 ### Exact prompt
 
